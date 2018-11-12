@@ -1,0 +1,90 @@
+%brs.tex
+\documentclass{llncs}
+\usepackage[a4paper, top=35mm, bottom=30mm, left=20mm, right=20mm]{geometry}
+\pagestyle{plain}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,tcolorbox}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{framed}
+\usepackage{xcolor, graphicx, enumitem}
+\usepackage{wrapfig, float}
+
+\title{Borromean Ring Signature Algorithm and Implementation}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Borromean Ring Signature Algorithm}
+\subsection{Signing}
+Suppose a signer has a collection of verification keys $P_{i,j}$ for $0\le i \le n-1, 0\le j\le m_i-1$, and wants to create a signature of knowledge of the $n$ keys $\{P_{i,j^*}\}^{n-1}_{i=0}$, where $j^*_i$s are some fixed and unknown (to a verifier) indices. Denote the secret key to $P_{i,j^*_i}$ by $x_i$. The signing process is as follows:
+\begin{enumerate}
+\item Compute $M$ as the hash of the message to be signed and the set of verification keys.
+\item For each $0\le i \le n-1$:
+\begin{enumerate}
+\item Choose a scalar $k_i$ uniformly at random.
+\item Set $e_{i,j^*_i+1}=H(M||k_iG||i||j^*_i)$.
+\item For $j$ such that $j^*_i\le j <m_i-1$ choose $s_{i,j}$ at random and compute
+$$
+e_{i,j+1}=H(M||s_{i,j}G+e_{i,j}P_{i,j}||i||j) \label{eq1}
+$$
+\end{enumerate}
+\item Choose $s_{i,m_i-1}$ for each $i$ at random and set 
+$$
+e_0=H(s_{0,m_0-1}G+e_{0,m_0-1}P_{0,m_0-1}||...||s_{n-1,m_{n-1}-1}G+e_{n-1,m_{n-1}-1}P_{n-1,m_{n-1}-1})
+$$
+\item For each $0 \le i \le n-1$:
+\begin{enumerate}
+\item For $j$ such that $0\le j<j^*_i$ choose $s_{i,j}$ at random and compute
+$$
+e_{i,j+1}=H(M||s_{i,j}G+e_{i,j}P_{i,j}||i||j)
+$$
+where $e_{i,0}$ means $e_0$.
+\item Set $s_{i,j^*_i}=k_i-x_ie_{i,j^*_i}$.
+\end{enumerate}
+\end{enumerate}
+The resulting signature on m consistes of 
+$$
+\sigma = \{e_0, s_{i,j}: 0\le i\le n-1, 0\le j\le m_i-1\}
+$$
+
+
+\subsection{Verification}
+The verifier verifies the signature $\sigma$ based on the message $m$ and a collection $\{P_{i,j}\}$ as follows:
+\begin{enumerate}
+\item Compute $M$ as the hash of the message and the set of verification keys.
+\item For each $0\le i \le n-1$, for each $0\le j \le m_j-1$, compute $R_{i,j}=s_{i,j}G+e_{i,j}P_{i,j}$ and $e_{i,j+1} = H(M||R_{i,j}||i||j)$. $e_{i,0}=e_0$.
+\item Compute $e'_0=H(R_{0,m_0-1}||...||R_{n-1,m_{n-1}-1})$ and return 1 iff $e'_0=e_0$
+\end{enumerate}
+
+\subsection{Explanation on the Algorithm}
+Let's formulate the ring based on the signing algorithm. For $i_{th}$ ring, it starts from node $j^*_i$ and the signer calculates the next hash as $e_{i,j^*_i+1}=H(M||k_iG||i||j^*_i)$. Then the signer goes on calculating $e_{i,j^*_i+2}$, ..., $e_{i,m_i-1}$,  until he gets to the last node $m_i-1$ of ring $i$. The following equation is used in the next hash calculation:
+\begin{equation}
+\label{eq1}
+e_{i,j+1}=H(M||s_{i,j}G+e_{i,j}P_{i,j}||i||j) 
+\end{equation}
+The next hash of last node $m_i-1$ of ring $i$ is defined as $e_0$, which links the last and first node thus forming a ring:
+\begin{equation}
+\label{eq2}
+e_0=H(s_{0,m_0-1}G+e_{0,m_0-1}P_{0,m_0-1}||...||s_{n-1,m_{n-1}-1}G+e_{n-1,m_{n-1}-1}P_{n-1,m_{n-1}-1})
+\end{equation}
+This loops back to node $0$ of ring $i$ and the signer goes on calculating $e_{i,1}$,..., $e_{i,j^*_i}$ until it gets back to node $j^*_i$, using the same Eq.\ref{eq1}. Following this equation, we should have the next hash of node $j^*_i$ of ring $i$ to be $e_{i,j^*_i+1}=H(M||s_{i,j^*_i}G+e_{i,j^*_i}P_{i,j^*_i}||i||j^*_i)$. But in the first calculation, we already have  $e_{i,j^*_i+1}=H(M||k_iG||i||j^*_i)$. To make sure both of the next hash equations are satisfied, the signer makes use of the knowledge of $x_i$ and sets $s_{i,j^*_i}$ as: $s_{i,j^*_i}=k_i-x_ie_{i,j^*_i}$. By multiplying both sides of this equation with $G$, we have:
+\begin{equation}
+\label{eq3}
+s_{i,j^*_i}G=k_iG-x_ie_{i,j^*_i}G 
+\end{equation}
+\begin{equation}
+\label{eq4}
+k_iG=s_{i,j^*_i}G+e_{i,j^*_i}P_{i,j^*_i}
+\end{equation}
+It is easy to see that both of the next hash equations are satisfied in this way. In calculating the ring signature, the $s_{i,j}$ of nodes for which the signer does not know the private key is randomly picked, while the $s_{i,j^*_i}$ of node for which the signer knows the private key is calculated using the knowledge of $x_i$. In this way, any verifier, starting from $e_0$, can calculate the next hash from node $0$, ..., until node $m_i-1$ of ring $i$, using Eq.\ref{eq1}. The verifier finally computes the $e'_0$ using Eq.\ref{eq2}. If $e'_0=e_0$, meaning all the $n$ rings can be connected, the signer must know at least one private key of each ring $i$.
+
+\section{Implementation}
+We used the GO's btcec library (https://godoc.org/github.com/btcsuite/btcd/btcec) which conntains the parameters and methods to compute with the elliptic curve secp256k1. We use Go’s built-in SHA-256 implementation for our cryptographic hash function.
+
+
+
+\end{document}
